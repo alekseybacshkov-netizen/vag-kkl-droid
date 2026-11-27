@@ -14,162 +14,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate clean project files
+      - name: Generate XML
         run: |
-          mkdir -p app/src/main/res/xml app/src/main/res/layout app/src/main/java/com/vag/kkldroid
-
+          mkdir -p app/src/main/res/xml
           echo "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPG1hbmlmZXN0IHhtbG5zOmFuZHJvaWQ9Imh0dHA6Ly9zY2hlbWFzLmFuZHJvaWQuY29tL2Fway9yZXMvYW5kcm9pZCI+CiAgICA8dXNlcy1mZWF0dXJlIGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5oYXJkd2FyZS51c2IuaG9zdCIgYW5kcm9pZDpyZXF1aXJlZD0idHJ1ZSIgLz4KICAgIDxhcHBsaWNhdGlvbgogICAgICAgIGFuZHJvaWQ6YWxsb3dCYWNrdXA9InRydWUiCiAgICAgICAgYW5kcm9pZDpsYWJlbD0iVkFHLUtLTCBEaWFnbm9zdCIKICAgICAgICBhbmRyb2lkOnRoZW1lPSJAc3R5bGUvVGhlbWUuTWF0ZXJpYWxDb21wb25lbnRzLkRheU5pZ2h0LkRhcmtBY3Rpb25CYXIiPgogICAgICAgIDxhY3Rpdml0eQogICAgICAgICAgICBhbmRyb2lkOm5hbWU9Ii5NYWluQWN0aXZpdHkiCiAgICAgICAgICAgIGFuZHJvaWQ6ZXhwb3J0ZWQ9InRydWUiCiAgICAgICAgICAgIGFuZHJvaWQ6c2NyZWVuT3JpZW50YXRpb249InBvcnRyYWl0Ij4KICAgICAgICAgICAgPGludGVudC1maWx0ZXI+CiAgICAgICAgICAgICAgICA8YWN0aW9uIGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5pbnRlbnQuYWN0aW9uLk1BSU4iIC8+CiAgICAgICAgICAgICAgICA8Y2F0ZWdvcnkgYW5kcm9pZDpuYW1lPSJhbmRyb2lkLmludGVudC5jYXRlZ29yeS5MQVVOQ0hFUiIgLz4KICAgICAgICAgICAgPC9pbnRlbnQtZmlsdGVyPgogICAgICAgICAgICA8aW50ZW50LWZpbHRlcj4KICAgICAgICAgICAgICAgIDxhY3Rpb24gYW5kcm9pZDpuYW1lPSJhbmRyb2lkLmhhcmR3YXJlLnVzYi5hY3Rpb24uVVNCX0RFVklDRV9BVFRBQ0hFRCIgLz4KICAgICAgICAgICAgPC9pbnRlbnQtZmlsdGVyPgogICAgICAgICAgICA8bWV0YS1kYXRhCiAgICAgICAgICAgICAgICBhbmRyb2lkOm5hbWU9ImFuZHJvaWQuaGFyZHdhcmUudXNiLmFjdGlvbi5VU0JfREVWSUNFX0FUVEFDSEVEIgogICAgICAgICAgICAgICAgYW5kcm9pZDpyZXNvdXJjZT0iQHhtbC9kZXZpY2VfZmlsdGVyIiAvPgogICAgICAgIDwvYWN0aXZpdHk+CiAgICA8L2FwcGxpY2F0aW9uPgo8L21hbmlmZXN0Pg==" | base64 -d > app/src/main/AndroidManifest.xml
-
           echo "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPHJlc291cmNlcz4KICAgIDx1c2ItZGV2aWNlIHZlbmRvci1pZD0iNjc5MCIgcHJvZHVjdC1pZD0iMjk5ODciIC8+CiAgICA8dXNiLWRldmljZSB2ZW5kb3ItaWQ9IjY3OTAiIHByb2R1Y3QtaWQ9IjIxNzk1IiAvPgogICAgPHVzYi1kZXZpY2UgdmVuZG9yLWlkPSIxMDI3IiBwcm9kdWN0LWlkPSIyNDU3NyIgLz4KPC9yZXNvdXJjZXM+" | base64 -d > app/src/main/res/xml/device_filter.xml
 
-          cat << 'EOF' > app/src/main/java/com/vag/kkldroid/MainActivity.kt
-          package com.vag.kkldroid
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-          import android.app.PendingIntent
-          import android.content.BroadcastReceiver
-          import android.content.Context
-          import android.content.Intent
-          import android.content.IntentFilter
-          import android.hardware.usb.UsbManager
-          import android.os.Build
-          import android.os.Bundle
-          import android.text.method.ScrollingMovementMethod
-          import android.widget.*
-          import androidx.appcompat.app.AppCompatActivity
-          import com.hoho.android.usbserial.driver.UsbSerialPort
-          import com.hoho.android.usbserial.driver.UsbSerialProber
-          import kotlinx.coroutines.*
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
 
-          class MainActivity : AppCompatActivity() {
+      - name: Build Debug APK
+        run: gradle assembleDebug
 
-              private val ACTION_USB_PERMISSION = "com.vag.kkldroid.USB_PERMISSION"
-              private var usbPort: UsbSerialPort? = null
-              private var isConnectedToEcu = false
-              private var pollingJob: Job? = null
-              private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-
-              private lateinit var tvStatus: TextView
-              private lateinit var tvEcuInfo: TextView
-              private lateinit var tvOutput: TextView
-              private lateinit var spinnerModule: Spinner
-              private lateinit var etGroup: EditText
-              private lateinit var tvCells: List<TextView>
-
-              private val vagDtcDict = mapOf(
-                  "16486" to "P0102 - DMRV (G70): nizkiy signal",
-                  "16487" to "P0103 - DMRV (G70): vysokiy signal",
-                  "16514" to "P0130 - Lambda 1: sboy cepi",
-                  "16555" to "P0171 - Bednaya smes",
-                  "16556" to "P0172 - Bogataya smes",
-                  "16684" to "P0300 - Propuski vosplameneniya",
-                  "16685" to "P0301 - Propuski cil. 1",
-                  "16686" to "P0302 - Propuski cil. 2",
-                  "16687" to "P0303 - Propuski cil. 3",
-                  "16688" to "P0304 - Propuski cil. 4",
-                  "16705" to "P0321 - DPKV (G28): nedostoverny signal",
-                  "16725" to "P0341 - DPRV (G40): nedostoverny signal",
-                  "16825" to "P0441 - Ventilyaciya baka EVAP",
-                  "17535" to "P1127 - Pereobogashenie smesi",
-                  "17536" to "P1128 - Pereobednenie smesi",
-                  "17705" to "P1297 - Padenie davleniya turbina-drossel",
-                  "17965" to "P1557 - Pereduv turbiny",
-                  "17978" to "P1570 - Blokirovka EBU (Immo)",
-                  "18010" to "P1602 - Nizkoe napryazhenie kl. 30"
-              )
-
-              private val modules = listOf(
-                  Pair("01 - Engine (1.8T AWM KWP2000)", 0x01),
-                  Pair("02 - AT Transmission (KWP1281)", 0x02),
-                  Pair("03 - ABS Brakes (KWP1281)", 0x03),
-                  Pair("15 - Airbags (KWP1281)", 0x15),
-                  Pair("17 - Instruments (KWP1281)", 0x17),
-                  Pair("46 - Central Conv. (KWP1281)", 0x46)
-              )
-
-              private val usbReceiver = object : BroadcastReceiver() {
-                  override fun onReceive(context: Context, intent: Intent) {
-                      if (ACTION_USB_PERMISSION == intent.action) {
-                          val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                          if (granted) connectUsbAndEcu() else log("USB permission denied.")
-                      }
-                  }
-              }
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  setContentView(R.layout.activity_main)
-
-                  tvStatus = findViewById(R.id.tvStatus)
-                  tvEcuInfo = findViewById(R.id.tvEcuInfo)
-                  tvOutput = findViewById(R.id.tvOutput)
-                  tvOutput.movementMethod = ScrollingMovementMethod()
-                  spinnerModule = findViewById(R.id.spinnerModule)
-                  etGroup = findViewById(R.id.etGroup)
-                  tvCells = listOf(
-                      findViewById(R.id.tvCell1),
-                      findViewById(R.id.tvCell2),
-                      findViewById(R.id.tvCell3),
-                      findViewById(R.id.tvCell4)
-                  )
-
-                  spinnerModule.adapter = ArrayAdapter(
-                      this,
-                      android.R.layout.simple_spinner_dropdown_item,
-                      modules.map { it.first }
-                  )
-
-                  val filter = IntentFilter(ACTION_USB_PERMISSION)
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                      registerReceiver(usbReceiver, filter, RECEIVER_NOT_EXPORTED)
-                  } else {
-                      registerReceiver(usbReceiver, filter)
-                  }
-
-                  findViewById<Button>(R.id.btnConnect).setOnClickListener { requestUsbConnection() }
-                  findViewById<Button>(R.id.btnReadDtc).setOnClickListener { readFaultCodes() }
-                  findViewById<Button>(R.id.btnClearDtc).setOnClickListener { clearFaultCodes() }
-                  findViewById<Button>(R.id.btnReadGroup).setOnClickListener { toggleGroupPolling() }
-                  findViewById<Button>(R.id.btnBasic060).setOnClickListener { runThrottleAdaptation060() }
-              }
-
-              private fun requestUsbConnection() {
-                  val manager = getSystemService(Context.USB_SERVICE) as UsbManager
-                  val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
-                  if (drivers.isEmpty()) {
-                      log("CH340/FTDI not found! Check OTG and ignition.")
-                      return
-                  }
-                  val driver = drivers.first()
-                  if (!manager.hasPermission(driver.device)) {
-                      val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-                      val pi = PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flags)
-                      manager.requestPermission(driver.device, pi)
-                  } else {
-                      connectUsbAndEcu()
-                  }
-              }
-
-              private fun connectUsbAndEcu() {
-                  pollingJob?.cancel()
-                  scope.launch(Dispatchers.IO) {
-                      try {
-                          val manager = getSystemService(Context.USB_SERVICE) as UsbManager
-                          val driver = UsbSerialProber.getDefaultProber().findAllDrivers(manager).firstOrNull() ?: return@launch
-                          val connection = manager.openDevice(driver.device) ?: return@launch
-
-                          usbPort?.close()
-                          usbPort = driver.ports.first()
-                          usbPort?.open(connection)
-                          usbPort?.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
-                          withContext(Dispatchers.Main) {
-                              tvStatus.text = "USB: Connected (${driver.device.productName ?: "CH340"})"
-                              tvStatus.setTextColor(0xFF00E676.toInt())
-                          }
-
-                          val selectedAddr = modules[spinnerModule.selectedItemPosition].second
-                          if (selectedAddr == 0x01) {
-                              initKwp2000Engine()
-                          } else {
-                              initKwp1281Slow(selectedAddr)
-                          }
+      - name: Publish Release APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0-${{ github.run_number }}
+          name: VAG-KKL APK v1.0.${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
