@@ -170,3 +170,19 @@ jobs:
                           } else {
                               initKwp1281Slow(selectedAddr)
                           }
+
+                                - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VAG-KKL-Droid-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish Release APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0-${{ github.run_number }}
+          name: VAG-KKL Диагност v1.0 (сборка ${{ github.run_number }})
+          files: app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
