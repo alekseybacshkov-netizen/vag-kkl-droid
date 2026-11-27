@@ -31,41 +31,40 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvCells: List<TextView>
 
     private val vagDtcDict = mapOf(
-        "16486" to "P0102 - ДМРВ (G70): слишком низкий уровень сигнала",
-        "16487" to "P0103 - ДМРВ (G70): слишком высокий уровень сигнала",
-        "16514" to "P0130 - Ряд 1, зонд 1: сбой в электрической цепи",
-        "16555" to "P0171 - Ряд 1, система определения параметров топливо-возд. смеси: бедная смесь",
-        "16556" to "P0172 - Ряд 1, система определения параметров топливо-возд. смеси: богатая смесь",
-        "16684" to "P0300 - Обнаружены пропуски воспламенения",
-        "16685" to "P0301 - Цилиндр 1: обнаружены пропуски воспламенения",
-        "16686" to "P0302 - Цилиндр 2: обнаружены пропуски воспламенения",
-        "16687" to "P0303 - Цилиндр 3: обнаружены пропуски воспламенения",
-        "16688" to "P0304 - Цилиндр 4: обнаружены пропуски воспламенения",
-        "16705" to "P0321 - Датчик оборотов двигателя (G28): недостоверный сигнал",
-        "16725" to "P0341 - Датчик положения распредвала (G40): недостоверный сигнал",
-        "16825" to "P0441 - Система вентиляции топливного бака: неверная пропускная способность",
-        "17535" to "P1127 - Ряд 1, адаптация смеси (под нагрузкой): переобогащение смеси",
-        "17536" to "P1128 - Ряд 1, адаптация смеси (под нагрузкой): переобеднение смеси",
-        "17705" to "P1297 - Падение давления между турбиной и дроссельной заслонкой (проверьте байпас/опрессовку)",
-        "17965" to "P1557 - Регулятор давления наддува: выход из диапазона регулирования (передув)",
-        "17978" to "P1570 - Блокирован блок управления двигателя (Иммобилайзер)",
-        "18010" to "P1602 - Напряжение питания на кл. 30: напряжение слишком низкое (снималась клемма АКБ)"
+        "16486" to "P0102 - DMRV (G70): nizkiy signal",
+        "16487" to "P0103 - DMRV (G70): vysokiy signal",
+        "16514" to "P0130 - Lambda 1: sboy cepi",
+        "16555" to "P0171 - Bednaya smes",
+        "16556" to "P0172 - Bogataya smes",
+        "16684" to "P0300 - Propuski vosplameneniya",
+        "16685" to "P0301 - Propuski cil. 1",
+        "16686" to "P0302 - Propuski cil. 2",
+        "16687" to "P0303 - Propuski cil. 3",
+        "16688" to "P0304 - Propuski cil. 4",
+        "16705" to "P0321 - DPKV (G28): nedostoverny signal",
+        "16725" to "P0341 - DPRV (G40): nedostoverny signal",
+        "16825" to "P0441 - Ventilyaciya baka EVAP",
+        "17535" to "P1127 - Pereobogashenie smesi",
+        "17536" to "P1128 - Pereobednenie smesi",
+        "17705" to "P1297 - Padenie davleniya turbina-drossel",
+        "17965" to "P1557 - Pereduv turbiny",
+        "17978" to "P1570 - Blokirovka EBU (Immo)",
+        "18010" to "P1602 - Nizkoe napryazhenie kl. 30"
     )
-
     private val modules = listOf(
-        Pair("01 - Двигатель (1.8T AWM - KWP2000)", 0x01),
-        Pair("02 - АКПП (KWP1281)", 0x02),
-        Pair("03 - Тормозная система ABS (KWP1281)", 0x03),
-        Pair("15 - Подушки безопасности Airbag (KWP1281)", 0x15),
-        Pair("17 - Комбинация приборов (KWP1281)", 0x17),
-        Pair("46 - Блок комфорта (KWP1281)", 0x46)
+        Pair("01 - Engine (1.8T AWM KWP2000)", 0x01),
+        Pair("02 - AT Transmission (KWP1281)", 0x02),
+        Pair("03 - ABS Brakes (KWP1281)", 0x03),
+        Pair("15 - Airbags (KWP1281)", 0x15),
+        Pair("17 - Instruments (KWP1281)", 0x17),
+        Pair("46 - Central Conv. (KWP1281)", 0x46)
     )
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (ACTION_USB_PERMISSION == intent.action) {
                 val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                if (granted) connectUsbAndEcu() else log("Отказано в доступе к USB.")
+                if (granted) connectUsbAndEcu() else log("USB permission denied.")
             }
         }
     }
@@ -80,18 +79,9 @@ class MainActivity : AppCompatActivity() {
         tvOutput.movementMethod = ScrollingMovementMethod()
         spinnerModule = findViewById(R.id.spinnerModule)
         etGroup = findViewById(R.id.etGroup)
-        tvCells = listOf(
-            findViewById(R.id.tvCell1),
-            findViewById(R.id.tvCell2),
-            findViewById(R.id.tvCell3),
-            findViewById(R.id.tvCell4)
-        )
+        tvCells = listOf(findViewById(R.id.tvCell1), findViewById(R.id.tvCell2), findViewById(R.id.tvCell3), findViewById(R.id.tvCell4))
 
-        spinnerModule.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            modules.map { it.first }
-        )
+        spinnerModule.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modules.map { it.first })
 
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -110,18 +100,12 @@ class MainActivity : AppCompatActivity() {
     private fun requestUsbConnection() {
         val manager = getSystemService(Context.USB_SERVICE) as UsbManager
         val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
-        if (drivers.isEmpty()) {
-            log("Адаптер CH340/FTDI не найден! Проверьте OTG и зажигание.")
-            return
-        }
+        if (drivers.isEmpty()) { log("CH340/FTDI not found!"); return }
         val driver = drivers.first()
         if (!manager.hasPermission(driver.device)) {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-            val pi = PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flags)
-            manager.requestPermission(driver.device, pi)
-        } else {
-            connectUsbAndEcu()
-        }
+            manager.requestPermission(driver.device, PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flags))
+        } else connectUsbAndEcu()
     }
 
     private fun connectUsbAndEcu() {
@@ -131,87 +115,168 @@ class MainActivity : AppCompatActivity() {
                 val manager = getSystemService(Context.USB_SERVICE) as UsbManager
                 val driver = UsbSerialProber.getDefaultProber().findAllDrivers(manager).firstOrNull() ?: return@launch
                 val connection = manager.openDevice(driver.device) ?: return@launch
-
                 usbPort?.close()
                 usbPort = driver.ports.first()
                 usbPort?.open(connection)
                 usbPort?.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
                 withContext(Dispatchers.Main) {
-                    tvStatus.text = "USB: Подключен (${driver.device.productName ?: "CH340"})"
+                    tvStatus.text = "USB: Connected (${driver.device.productName ?: "CH340"})"
                     tvStatus.setTextColor(0xFF00E676.toInt())
                 }
-
-                val selectedAddr = modules[spinnerModule.selectedItemPosition].second
-                if (selectedAddr == 0x01) {
-                    initKwp2000Engine()
-                } else {
-                    initKwp1281Slow(selectedAddr)
-                }
-            } catch (e: Exception) {
-                log("Ошибка порта: ${e.message}")
-            }
+                val addr = modules[spinnerModule.selectedItemPosition].second
+                if (addr == 0x01) initKwp2000Engine() else initKwp1281Slow(addr)
+            } catch (e: Exception) { log("Port error: ${e.message}") }
         }
     }
-
     private suspend fun initKwp2000Engine() {
         val port = usbPort ?: return
-        log("Запуск Fast Init (KWP2000) для блока 01 (AWM ME7.5)...")
-
+        log("Fast Init (KWP2000) for 01 Engine...")
         port.setParameters(360, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         port.write(byteArrayOf(0x00), 50)
         delay(25)
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
-        val startReq = byteArrayOf(0x81.toByte(), 0x10, 0xF1.toByte(), 0x81.toByte(), 0x03)
-        val resp = sendAndReceive(startReq, 400)
-
+        val resp = sendAndReceive(byteArrayOf(0x81.toByte(), 0x10, 0xF1.toByte(), 0x81.toByte(), 0x03), 400)
         if (resp.isNotEmpty() && resp.contains(0xC1.toByte())) {
             isConnectedToEcu = true
-            log("УСПЕХ! Связь с Bosch ME7.5 установлена: ${resp.toHex()}")
+            log("OK! Bosch ME7.5 connected: ${resp.toHex()}")
             val idResp = sendKwp2000Payload(byteArrayOf(0x21, 0x9B.toByte()))
             val ascii = idResp.filter { it in 32..126 }.map { it.toInt().toChar() }.joinToString("")
-            withContext(Dispatchers.Main) {
-                tvEcuInfo.text = "ЭБУ: ${if (ascii.isNotEmpty()) ascii else "Bosch Motronic ME7.5 (AWM)"}"
-            }
+            withContext(Dispatchers.Main) { tvEcuInfo.text = "ECU: ${ascii.ifEmpty { "Bosch ME7.5 AWM" }}" }
         } else {
             isConnectedToEcu = false
-            log("Нет ответа от ЭБУ по Fast Init (ответ: ${resp.toHex()}). Пробуем 5-baud KWP1281...")
+            log("No Fast Init (${resp.toHex()}). Trying 5-baud...")
             initKwp1281Slow(0x01)
         }
     }
 
     private suspend fun initKwp1281Slow(address: Int) {
         val port = usbPort ?: return
-        log("Попытка 5-baud инициализации адреса 0x${address.toString(16).uppercase()}...")
+        log("5-baud init 0x${address.toString(16).uppercase()}...")
         port.setParameters(5, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         port.write(byteArrayOf(address.toByte()), 2200)
         delay(2100)
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
         val buf = ByteArray(32)
         val len = port.read(buf, 500)
         if (len > 0) {
             val sync = buf.copyOf(len)
-            log("Получен синхроимпульс: ${sync.toHex()}")
+            log("Sync: ${sync.toHex()}")
             if (sync.size >= 3) {
-                val kw2Inv = (sync.last().toInt() xor 0xFF).toByte()
                 delay(30)
-                port.write(byteArrayOf(kw2Inv), 100)
+                port.write(byteArrayOf((sync.last().toInt() xor 0xFF).toByte()), 100)
                 isConnectedToEcu = true
-                log("Блок 0x${address.toString(16)} ответил (KWP1281)!")
+                log("Connected KWP1281!")
             }
-        } else {
-            log("Блок 0x${address.toString(16)} не ответил. На CH340 5-baud init может требовать повтора.")
-        }
+        } else log("No response from 0x${address.toString(16)}.")
     }
 
     private fun readFaultCodes() {
-        if (!isConnectedToEcu) {
-            log("Сначала нажмите «Подключить»!")
-            return
-        }
+        if (!isConnectedToEcu) { log("Press Connect first!"); return }
         scope.launch(Dispatchers.IO) {
-            log("Чтение заводских кодов ошибок VAG (18 00 FF 00)...")
+            log("Reading DTCs (18 00 FF 00)...")
             val resp = sendKwp2000Payload(byteArrayOf(0x18, 0x00, 0xFF.toByte(), 0x00))
-            if (resp.isEmpty()) {
+            log("DTC Raw: ${resp.toHex()}")
+            val idx = resp.indexOf(0x58.toByte())
+            if (idx != -1 && resp.size > idx + 1) {
+                val count = resp[idx + 1].toInt() and 0xFF
+                if (count == 0) log("0 DTCs found.") else {
+                    var pos = idx + 2
+                    for (i in 0 until count) {
+                        if (pos + 2 < resp.size) {
+                            val code = ((resp[pos].toInt() and 0xFF) shl 8) or (resp[pos + 1].toInt() and 0xFF)
+                            val st = resp[pos + 2].toInt() and 0xFF
+                            val cStr = code.toString().padStart(5, '0')
+                            val hStr = code.toString(16).uppercase().padStart(4, '0')
+                            log("- $cStr ($hStr) ${if ((st and 0x80) != 0) "[Interm]" else "[Static]"}: ${vagDtcDict[cStr] ?: "VAG DTC"}")
+                            pos += 3
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun clearFaultCodes() {
+        if (!isConnectedToEcu) { log("Press Connect first!"); return }
+        scope.launch(Dispatchers.IO) {
+            val resp = sendKwp2000Payload(byteArrayOf(0x14, 0xFF.toByte(), 0x00))
+            log(if (resp.contains(0x54.toByte())) "DTCs cleared!" else "Clear resp: ${resp.toHex()}")
+        }
+    }
+
+    private fun toggleGroupPolling() {
+        if (pollingJob?.isActive == true) { pollingJob?.cancel(); log("Stopped."); return }
+        if (!isConnectedToEcu) { log("Connect first!"); return }
+        val g = etGroup.text.toString().toIntOrNull() ?: 1
+        pollingJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                val resp = sendKwp2000Payload(byteArrayOf(0x21, g.toByte()))
+                val idx = resp.indexOf(0x61.toByte())
+                if (idx != -1 && resp.size > idx + 2) parseVagGroup(g, resp.sliceArray((idx + 2) until resp.size))
+                delay(250)
+            }
+        }
+    }
+
+    private suspend fun parseVagGroup(group: Int, data: ByteArray) {
+        val cells = Array(4) { "---" }
+        for (i in 0 until 4) {
+            val off = i * 2
+            if (off + 1 < data.size) {
+                val a = data[off].toInt() and 0xFF
+                val b = data[off + 1].toInt() and 0xFF
+                cells[i] = when {
+                    group == 1 && i == 0 -> "${b * 40} RPM"
+                    group == 1 && i == 1 -> "${(b * 0.75 - 48).toInt()} C"
+                    group == 3 && i == 1 -> "${String.format("%.1f", b * 0.25)} g/s"
+                    group == 115 && i == 2 -> "${b * 10} mbar (Req)"
+                    group == 115 && i == 3 -> "${b * 10} mbar (Act)"
+                    else -> "A:$a B:$b"
+                }
+            }
+        }
+        withContext(Dispatchers.Main) { for (i in 0..3) tvCells[i].text = "Field ${i + 1}\n${cells[i]}" }
+    }
+
+    private fun runThrottleAdaptation060() {
+        if (!isConnectedToEcu) { log("Connect first!"); return }
+        scope.launch(Dispatchers.IO) {
+            val resp = sendKwp2000Payload(byteArrayOf(0x31, 0x60, 0x00))
+            log("TBA 060 resp: ${resp.toHex()}")
+        }
+    }
+
+    private suspend fun sendKwp2000Payload(payload: ByteArray): ByteArray {
+        val hdr = byteArrayOf((0x80 or payload.size).toByte(), 0x10, 0xF1.toByte()) + payload
+        val cs = (hdr.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
+        return sendAndReceive(hdr + cs, 300)
+    }
+
+    private suspend fun sendAndReceive(packet: ByteArray, timeoutMs: Int): ByteArray {
+        val port = usbPort ?: return byteArrayOf()
+        return try {
+            port.read(ByteArray(64), 10)
+            port.write(packet, 100)
+            delay(40)
+            val buf = ByteArray(256)
+            val total = mutableListOf<Byte>()
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < timeoutMs) {
+                val r = port.read(buf, 50)
+                if (r > 0) { for (i in 0 until r) total.add(buf[i]) } else if (total.size > packet.size) break
+            }
+            val all = total.toByteArray()
+            if (all.size > packet.size) all.sliceArray(packet.size until all.size) else byteArrayOf()
+        } catch (e: Exception) { byteArrayOf() }
+    }
+
+    private fun log(msg: String) { scope.launch(Dispatchers.Main) { tvOutput.append("$msg\n") } }
+    private fun ByteArray.toHex(): String = joinToString(" ") { "%02X".format(it) }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pollingJob?.cancel()
+        usbPort?.close()
+        unregisterReceiver(usbReceiver)
+    }
+}
