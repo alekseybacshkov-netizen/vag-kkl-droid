@@ -5,10 +5,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
+import android.graphics.Typeface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.text.method.ScrollingMovementMethod
+import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.hoho.android.usbserial.driver.UsbSerialPort
@@ -71,17 +75,80 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        tvStatus = findViewById(R.id.tvStatus)
-        tvEcuInfo = findViewById(R.id.tvEcuInfo)
-        tvOutput = findViewById(R.id.tvOutput)
-        tvOutput.movementMethod = ScrollingMovementMethod()
-        spinnerModule = findViewById(R.id.spinnerModule)
-        etGroup = findViewById(R.id.etGroup)
-        tvCells = listOf(findViewById(R.id.tvCell1), findViewById(R.id.tvCell2), findViewById(R.id.tvCell3), findViewById(R.id.tvCell4))
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#121212"))
+            setPadding(24, 24, 24, 24)
+        }
 
-        spinnerModule.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modules.map { it.first })
+        tvStatus = TextView(this).apply {
+            text = "USB: Not connected"
+            setTextColor(Color.parseColor("#FF5252"))
+            setBackgroundColor(Color.parseColor("#1E1E1E"))
+            setPadding(20, 20, 20, 20)
+            setTypeface(null, Typeface.BOLD)
+        }
+        root.addView(tvStatus)
+
+        spinnerModule = Spinner(this).apply {
+            setBackgroundColor(Color.parseColor("#2C2C2C"))
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, modules.map { it.first })
+        }
+        root.addView(spinnerModule)
+
+        val btnConnect = Button(this).apply { text = "CONNECT ECU" }
+        root.addView(btnConnect)
+
+        tvEcuInfo = TextView(this).apply {
+            text = "ECU: none"
+            setTextColor(Color.LTGRAY)
+            setPadding(10, 10, 10, 10)
+        }
+        root.addView(tvEcuInfo)
+
+        val rowDtc = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val btnReadDtc = Button(this).apply { text = "02 - DTC" }
+        val btnClearDtc = Button(this).apply { text = "05 - CLEAR" }
+        rowDtc.addView(btnReadDtc, LinearLayout.LayoutParams(0, -2, 1f))
+        rowDtc.addView(btnClearDtc, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(rowDtc)
+
+        val rowGrp = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        etGroup = EditText(this).apply {
+            setText("001")
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#2C2C2C"))
+            gravity = Gravity.CENTER
+        }
+        val btnReadGroup = Button(this).apply { text = "08 - GROUP" }
+        val btnBasic060 = Button(this).apply { text = "060 TBA" }
+        rowGrp.addView(etGroup, LinearLayout.LayoutParams(160, -2))
+        rowGrp.addView(btnReadGroup, LinearLayout.LayoutParams(0, -2, 1f))
+        rowGrp.addView(btnBasic060, LinearLayout.LayoutParams(-2, -2))
+        root.addView(rowGrp)
+
+        tvCells = (1..4).map { idx ->
+            TextView(this).apply {
+                text = "Field $idx: ---"
+                setTextColor(Color.parseColor("#80CBC4"))
+                setBackgroundColor(Color.parseColor("#263238"))
+                setPadding(16, 12, 16, 12)
+            }.also { root.addView(it) }
+        }
+
+        tvOutput = TextView(this).apply {
+            text = "Ready...\n"
+            setTextColor(Color.parseColor("#00E676"))
+            setBackgroundColor(Color.BLACK)
+            typeface = Typeface.MONOSPACE
+            setPadding(16, 16, 16, 16)
+            movementMethod = ScrollingMovementMethod()
+        }
+        root.addView(tvOutput, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        setContentView(root)
 
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -90,13 +157,12 @@ class MainActivity : AppCompatActivity() {
             registerReceiver(usbReceiver, filter)
         }
 
-        findViewById<Button>(R.id.btnConnect).setOnClickListener { requestUsbConnection() }
-        findViewById<Button>(R.id.btnReadDtc).setOnClickListener { readFaultCodes() }
-        findViewById<Button>(R.id.btnClearDtc).setOnClickListener { clearFaultCodes() }
-        findViewById<Button>(R.id.btnReadGroup).setOnClickListener { toggleGroupPolling() }
-        findViewById<Button>(R.id.btnBasic060).setOnClickListener { runThrottleAdaptation060() }
+        btnConnect.setOnClickListener { requestUsbConnection() }
+        btnReadDtc.setOnClickListener { readFaultCodes() }
+        btnClearDtc.setOnClickListener { clearFaultCodes() }
+        btnReadGroup.setOnClickListener { toggleGroupPolling() }
+        btnBasic060.setOnClickListener { runThrottleAdaptation060() }
     }
-
     private fun requestUsbConnection() {
         val manager = getSystemService(Context.USB_SERVICE) as UsbManager
         val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
@@ -121,13 +187,14 @@ class MainActivity : AppCompatActivity() {
                 usbPort?.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
                 withContext(Dispatchers.Main) {
                     tvStatus.text = "USB: Connected (${driver.device.productName ?: "CH340"})"
-                    tvStatus.setTextColor(0xFF00E676.toInt())
+                    tvStatus.setTextColor(Color.parseColor("#00E676"))
                 }
                 val addr = modules[spinnerModule.selectedItemPosition].second
                 if (addr == 0x01) initKwp2000Engine() else initKwp1281Slow(addr)
             } catch (e: Exception) { log("Port error: ${e.message}") }
         }
     }
+
     private suspend fun initKwp2000Engine() {
         val port = usbPort ?: return
         log("Fast Init (KWP2000) for 01 Engine...")
@@ -235,7 +302,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        withContext(Dispatchers.Main) { for (i in 0..3) tvCells[i].text = "Field ${i + 1}\n${cells[i]}" }
+        withContext(Dispatchers.Main) { for (i in 0..3) tvCells[i].text = "Field ${i + 1}: ${cells[i]}" }
     }
 
     private fun runThrottleAdaptation060() {
