@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
@@ -31,7 +30,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etGroup: EditText
     private lateinit var tvCells: List<TextView>
 
-    // Словарь частых заводских ошибок Passat B5+ 1.8T AWM
     private val vagDtcDict = mapOf(
         "16486" to "P0102 - ДМРВ (G70): слишком низкий уровень сигнала",
         "16487" to "P0103 - ДМРВ (G70): слишком высокий уровень сигнала",
@@ -116,7 +114,7 @@ class MainActivity : AppCompatActivity() {
             log("Адаптер CH340/FTDI не найден! Проверьте OTG и зажигание.")
             return
         }
-        val driver = drivers[0]
+        val driver = drivers.first()
         if (!manager.hasPermission(driver.device)) {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
             val pi = PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flags)
@@ -135,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                 val connection = manager.openDevice(driver.device) ?: return@launch
 
                 usbPort?.close()
-                usbPort = driver.ports[0]
+                usbPort = driver.ports.first()
                 usbPort?.open(connection)
                 usbPort?.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 
@@ -156,25 +154,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Быстрая инициализация KWP2000 (Fast Init 25ms) для Bosch ME7.5 (1.8T AWM)
     private suspend fun initKwp2000Engine() {
         val port = usbPort ?: return
         log("Запуск Fast Init (KWP2000) для блока 01 (AWM ME7.5)...")
 
-        // Эмуляция 25ms Low + 25ms High через break/baudrate для CH340
         port.setParameters(360, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-        port.write(byteArrayOf(0x00), 50) // ~25ms импульс низкого уровня
+        port.write(byteArrayOf(0x00), 50)
         delay(25)
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 
-        // Запрос StartCommunication (81 10 F1 81 03)
         val startReq = byteArrayOf(0x81.toByte(), 0x10, 0xF1.toByte(), 0x81.toByte(), 0x03)
         val resp = sendAndReceive(startReq, 400)
 
         if (resp.isNotEmpty() && resp.contains(0xC1.toByte())) {
             isConnectedToEcu = true
             log("УСПЕХ! Связь с Bosch ME7.5 установлена: ${resp.toHex()}")
-            // Запрос идентификации ЭБУ (21 9B)
             val idResp = sendKwp2000Payload(byteArrayOf(0x21, 0x9B.toByte()))
             val ascii = idResp.filter { it in 32..126 }.map { it.toInt().toChar() }.joinToString("")
             withContext(Dispatchers.Main) {
@@ -187,11 +181,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Медленная 5-бодовая инициализация для блоков KWP1281 (ABS, АКПП, Комфорт, Airbag)
     private suspend fun initKwp1281Slow(address: Int) {
         val port = usbPort ?: return
         log("Попытка 5-baud инициализации адреса 0x${address.toString(16).uppercase()}...")
-        // Отправка адреса на скорости 5 бод (1 старт + 8 бит + 1 стоп = 2 сек)
         port.setParameters(5, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         port.write(byteArrayOf(address.toByte()), 2200)
         delay(2100)
@@ -203,7 +195,23 @@ class MainActivity : AppCompatActivity() {
             val sync = buf.copyOf(len)
             log("Получен синхроимпульс: ${sync.toHex()}")
             if (sync.size >= 3) {
-                // Инвертируем ключевой байт KW2 для подтверждения
                 val kw2Inv = (sync.last().toInt() xor 0xFF).toByte()
                 delay(30)
                 port.write(byteArrayOf(kw2Inv), 100)
+                isConnectedToEcu = true
+                log("Блок 0x${address.toString(16)} ответил (KWP1281)!")
+            }
+        } else {
+            log("Блок 0x${address.toString(16)} не ответил. На CH340 5-baud init может требовать повтора.")
+        }
+    }
+
+    private fun readFaultCodes() {
+        if (!isConnectedToEcu) {
+            log("Сначала нажмите «Подключить»!")
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            log("Чтение заводских кодов ошибок VAG (18 00 FF 00)...")
+            val resp = sendKwp2000Payload(byteArrayOf(0x18, 0x00, 0xFF.toByte(), 0x00))
+            if (resp.isEmpty()) {
