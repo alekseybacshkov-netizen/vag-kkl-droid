@@ -298,29 +298,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-        private suspend fun performSafe5BaudInit(port: UsbSerialPort, address: Int): ByteArray {
+            private suspend fun performSafe5BaudInit(port: UsbSerialPort, address: Int): ByteArray {
+        try {
+            port.dtr = true
+            port.rts = false
+        } catch (_: Exception) {}
+
+        // 1. K-line idle HIGH for 300ms
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         delay(300)
+        port.read(ByteArray(256), 10)
 
-        port.setParameters(300, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        // 2. Build exact 240-byte stream at 1200 baud (24 bytes = 200ms per bit, 10 bits = 2000ms total)
+        port.setParameters(1200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+        val stream = ByteArray(240)
+        var pos = 0
 
-        val bits = IntArray(10)
-        bits.set(0, 0)
-        for (i in 0..7) {
-            bits.set(i + 1, (address shr i) and 1)
-        }
-        bits.set(9, 1)
+        // Start bit = 0 (24 bytes of 0x00)
+        for (k in 0 until 24) stream.set(pos++, 0x00)
 
-        val lowBurst = ByteArray(6) { 0x00 }
-        for (bit in bits) {
-            if (bit == 0) {
-                port.write(lowBurst, 250)
-                delay(185)
-            } else {
-                delay(200)
-            }
+        // 8 data bits LSB first
+        for (bitIdx in 0..7) {
+            val bitVal = (address shr bitIdx) and 1
+            val fillByte: Byte = if (bitVal == 0) 0x00 else 0xFF.toByte()
+            for (k in 0 until 24) stream.set(pos++, fillByte)
         }
 
+        // Stop bit = 1 (24 bytes of 0xFF)
+        for (k in 0 until 24) stream.set(pos++, 0xFF.toByte())
+
+        // Write entire 2-second 5-baud waveform in one shot and wait until TX finishes!
+        port.write(stream, 2500)
+        delay(2010)
+
+        // 3. Switch to 10400 baud right on the stop bit to catch 0x55 KW1 KW2
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 
         val collected = mutableListOf<Byte>()
@@ -334,8 +345,45 @@ class MainActivity : AppCompatActivity() {
                 if (idx55 != -1 && collected.size >= idx55 + 3) break
             }
         }
+
+        // 4. Fallback for 1.8T AWM (0x01): KWP2000 Fast Init (25ms LOW + 25ms HIGH + 0x81)
+        if (address == 0x01 && !collected.contains(0x55.toByte())) {
+            log("Trying KWP2000 Fast Init...")
+            delay(100)
+            port.read(ByteArray(256), 10)
+
+            // 3 bytes of 0x00 at 1200 baud = 25.0ms continuous LOW
+            port.setParameters(1200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+            port.write(byteArrayOf(0x00, 0x00, 0x00), 100)
+            delay(26) // wait for 25ms LOW to finish transmitting
+
+            // Switch to 10400 baud and wait 25ms HIGH (tWuP = 50ms total)
+            port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+            delay(24)
+            port.read(ByteArray(128), 5)
+
+            val fastStart = byteArrayOf(0x81.toByte(), 0x10, 0xF1.toByte(), 0x81.toByte(), 0x03)
+            port.write(fastStart, 100)
+            delay(50)
+
+            val fastBuf = ByteArray(64)
+            val fastTotal = mutableListOf<Byte>()
+            val t0 = System.currentTimeMillis()
+            while (System.currentTimeMillis() - t0 < 400) {
+                val r = try { port.read(fastBuf, 40) } catch (_: Exception) { 0 }
+                if (r > 0) {
+                    for (i in 0 until r) fastTotal.add(fastBuf[i])
+                } else if (fastTotal.size > fastStart.size) break
+            }
+            log("FastInit RX: ${fastTotal.toByteArray().toHex()}")
+            if (fastTotal.contains(0xC1.toByte())) {
+                return byteArrayOf(0x55, 0xEF.toByte(), 0x8F.toByte())
+            }
+        }
+
         return collected.toByteArray()
     }
+
 
     // ==================== KWP2000 (1.8T AWM Engine) ====================
 
