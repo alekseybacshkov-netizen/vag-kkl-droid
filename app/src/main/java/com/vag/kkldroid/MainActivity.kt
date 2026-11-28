@@ -188,7 +188,7 @@ class MainActivity : AppCompatActivity() {
         btnBasic060.setOnClickListener { runThrottleAdaptation060() }
     }
 
-    private fun requestUsbConnection() {
+        private fun requestUsbConnection() {
         try {
             val manager = getSystemService(Context.USB_SERVICE) as UsbManager
             val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
@@ -199,9 +199,12 @@ class MainActivity : AppCompatActivity() {
             val driver = drivers.first()
             if (!manager.hasPermission(driver.device)) {
                 val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val explicitIntent = Intent(ACTION_USB_PERMISSION).apply {
+                    setPackage(packageName)
+                }
                 manager.requestPermission(
                     driver.device,
-                    PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flags)
+                    PendingIntent.getBroadcast(this, 0, explicitIntent, flags)
                 )
             } else {
                 connectUsbAndEcu()
@@ -210,6 +213,7 @@ class MainActivity : AppCompatActivity() {
             log("USB Req Err: ${e.message}")
         }
     }
+
 
     private fun disconnectEcu() {
         pollingJob?.cancel()
