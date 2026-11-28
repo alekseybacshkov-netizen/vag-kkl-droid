@@ -294,19 +294,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-    private suspend fun performSafe5BaudInit(port: UsbSerialPort, address: Int): ByteArray {
+        private suspend fun performSafe5BaudInit(port: UsbSerialPort, address: Int): ByteArray {
         port.setParameters(10400, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
         delay(300)
 
         port.setParameters(300, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
 
         val bits = IntArray(10)
-        bits[0] = 0
+        bits.set(0, 0)
         for (i in 0..7) {
-            bits[i + 1] = (address shr i) and 1
+            bits.set(i + 1, (address shr i) and 1)
         }
-        bits[9] = 1
+        bits.set(9, 1)
 
         val lowBurst = ByteArray(6) { 0x00 }
         for (bit in bits) {
@@ -333,7 +332,8 @@ class MainActivity : AppCompatActivity() {
         }
         return collected.toByteArray()
     }
-        // ==================== KWP2000 (1.8T AWM Engine) ====================
+
+    // ==================== KWP2000 (1.8T AWM Engine) ====================
 
     private suspend fun initKwp2000Session(port: UsbSerialPort, address: Int) {
         val buf = ByteArray(32)
@@ -397,8 +397,7 @@ class MainActivity : AppCompatActivity() {
             isBusy.set(false)
         }
     }
-
-    // ==================== KWP1281 (AT, ABS, Airbags, Instruments, Comfort) ====================
+        // ==================== KWP1281 (AT, ABS, Airbags, Instruments, Comfort) ====================
 
     private suspend fun initKwp1281Session(port: UsbSerialPort, address: Int) {
         activeProtocol = "KWP1281"
@@ -451,11 +450,11 @@ class MainActivity : AppCompatActivity() {
         return try {
             val len = 3 + data.size
             val frame = ByteArray(len + 1)
-            frame[0] = len.toByte()
-            frame[1] = kwp1281Seq.toByte()
-            frame[2] = title.toByte()
-            for (i in data.indices) frame[3 + i] = data[i]
-            frame[len] = 0x03
+            frame.set(0, len.toByte())
+            frame.set(1, kwp1281Seq.toByte())
+            frame.set(2, title.toByte())
+            for (i in data.indices) frame.set(3 + i, data[i])
+            frame.set(len, 0x03)
 
             kwp1281Seq = (kwp1281Seq + 1) and 0xFF
             if (kwp1281Seq == 0) kwp1281Seq = 1
@@ -508,14 +507,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (raw.size < 4) return null
-            kwp1281Seq = ((raw[1].toInt() and 0xFF) + 1) and 0xFF
-            val title = raw[2].toInt() and 0xFF
+            kwp1281Seq = ((raw.get(1).toInt() and 0xFF) + 1) and 0xFF
+            val title = raw.get(2).toInt() and 0xFF
             val payload = if (raw.size > 4) raw.subList(3, raw.size - 1).toByteArray() else byteArrayOf()
             Pair(title, payload)
         } catch (e: Exception) {
             null
         }
     }
+
     // ==================== DTC & MEASURING BLOCKS ====================
 
     private fun readFaultCodes() {
@@ -588,8 +588,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-    private fun clearFaultCodes() {
+        private fun clearFaultCodes() {
         if (!isConnectedToEcu) {
             log("Press Connect first!")
             return
@@ -723,4 +722,47 @@ class MainActivity : AppCompatActivity() {
         scope.launch(Dispatchers.IO) {
             if (activeProtocol == "KWP2000") {
                 val resp = sendKwp2000Payload(byteArrayOf(0x31, 0x60, 0x00))
-                
+                log("TBA 060 resp: ${resp.toHex()}")
+            } else {
+                log("TBA 060 supported on Engine (01) first.")
+            }
+        }
+    }
+
+    private fun stripEcho(sent: ByteArray, received: ByteArray): ByteArray {
+        if (received.size <= sent.size) return byteArrayOf()
+        var matches = true
+        for (i in sent.indices) {
+            if (sent[i] != received[i]) {
+                matches = false
+                break
+            }
+        }
+        return if (matches) received.sliceArray(sent.size until received.size) else received
+    }
+
+    private fun extractPrintableAscii(bytes: ByteArray): String {
+        val sb = StringBuilder()
+        for (b in bytes) {
+            val c = b.toInt() and 0xFF
+            if (c in 32..126) sb.append(c.toChar())
+        }
+        return sb.toString().trim()
+    }
+
+    private fun log(msg: String) {
+        scope.launch(Dispatchers.Main) {
+            tvOutput.append("$msg\n")
+        }
+    }
+
+    private fun ByteArray.toHex(): String = joinToString(" ") { "%02X".format(it) }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pollingJob?.cancel()
+        keepAliveJob?.cancel()
+        try { usbPort?.close() } catch (_: Exception) {}
+        try { unregisterReceiver(usbReceiver) } catch (_: Exception) {}
+    }
+}
